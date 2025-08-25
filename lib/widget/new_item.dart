@@ -37,7 +37,7 @@ class _NewItemState extends State<NewItem> {
                     if (value == null ||
                         value.trim().length <= 1 ||
                         value.trim().length >= 50) {
-                      return "Must be Between 1 and 50 char";
+                  return "Must be Between 1 and 50 char";
                     }
                     return null;
                   },
