@@ -1,6 +1,12 @@
+import 'dart:convert';
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
+import 'package:shop_app/data/categories.dart';
+import 'package:shop_app/models/category.dart';
 import 'package:shop_app/models/grocery_item.dart';
 import 'new_item.dart';
+import 'package:http/http.dart' as http;
 
 class GroceryList extends StatefulWidget {
   const GroceryList({super.key});
@@ -10,7 +16,61 @@ class GroceryList extends StatefulWidget {
 }
 
 class _GroceryListState extends State<GroceryList> {
-  final List<GroceryItem> _groceryItems = [];
+  bool isloading = true;
+  List<GroceryItem> _groceryItems = [];
+  _addeditem() async {
+    final GroceryItem? newItem = await Navigator.of(
+      context,
+    ).push<GroceryItem>(MaterialPageRoute(builder: (ctx) => const NewItem()));
+    if (newItem == null) return;
+    setState(() {
+      _groceryItems.add(newItem);
+    });
+  }
+
+  void loadedDate() async {
+    try {
+      final url = Uri.https(
+        'flutter-test-d1fb7-default-rtdb.firebaseio.com',
+        'text-test.json',
+      );
+      final res = await http.get(url);
+      final List<GroceryItem> loadedata = [];
+      final Map<String, dynamic> loadeditems = json.decode(res.body);
+      for (var item in loadeditems.entries) {
+        final Category category = categories.entries
+            .firstWhere((e) => e.value.title == item.value['category'])
+            .value;
+        loadedata.add(
+          GroceryItem(
+            id: item.key,
+            name: item.value['name'],
+            quantity: item.value['quantity'],
+            category: category,
+          ),
+        );
+      }
+      setState(() {
+        _groceryItems = loadedata;
+        isloading = false;
+      });
+    } catch (e) {
+      setState(() {
+        contant = const Center(
+          child: Text("Field to fetch data please try agine later"),
+        );
+      });
+      log(e.toString());
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    loadedDate();
+  }
+
+  Widget contant = const Center(child: CircularProgressIndicator());
 
   @override
   Widget build(BuildContext context) {
@@ -19,16 +79,7 @@ class _GroceryListState extends State<GroceryList> {
         actions: [
           IconButton(
             onPressed: () {
-              Navigator.of(context)
-                  .push<GroceryItem>(
-                    MaterialPageRoute(builder: (ctx) => const NewItem()),
-                  )
-                  .then((GroceryItem? value) {
-                    if (value == null) return;
-                    setState(() {
-                      _groceryItems.add(value);
-                    });
-                  });
+              _addeditem();
             },
             icon: const Icon(Icons.add),
           ),
@@ -45,15 +96,20 @@ class _GroceryListState extends State<GroceryList> {
         ),
         centerTitle: true,
       ),
-      body: _groceryItems.isEmpty
-          ? const Center(
-              child: Text('No Items Added !', style: TextStyle(fontSize: 35)),
-            )
-          : ListView.builder(
+
+      body: isloading
+          ? contant
+          : _groceryItems.isNotEmpty
+          ? ListView.builder(
               itemCount: _groceryItems.length,
               itemBuilder: (context, index) => Dismissible(
                 key: ValueKey(_groceryItems[index].id),
                 onDismissed: (_) {
+                  final url = Uri.https(
+                    'flutter-test-d1fb7-default-rtdb.firebaseio.com',
+                    'text-test/${_groceryItems[index].id}.json',
+                  );
+                  http.delete(url);
                   setState(() {
                     _groceryItems.remove(_groceryItems[index]);
                   });
@@ -78,6 +134,12 @@ class _GroceryListState extends State<GroceryList> {
                     ),
                   ),
                 ),
+              ),
+            )
+          : const Center(
+              child: Text(
+                "Not Items Added Yet",
+                style: TextStyle(fontSize: 35),
               ),
             ),
     );

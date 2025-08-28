@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:shop_app/data/categories.dart';
 import 'package:shop_app/models/category.dart';
+import 'package:http/http.dart' as http;
 import 'package:shop_app/models/grocery_item.dart';
 
 class NewItem extends StatefulWidget {
@@ -11,6 +14,44 @@ class NewItem extends StatefulWidget {
 }
 
 class _NewItemState extends State<NewItem> {
+  void saveditem() {
+    if (_formkey.currentState!.validate()) {
+      _formkey.currentState!.save();
+      setState(() {
+        _isloading = true;
+      });
+      final url = Uri.https(
+        'flutter-test-d1fb7-default-rtdb.firebaseio.com',
+        'text-test.json',
+      );
+      http
+          .post(
+            url,
+            headers: {'contant-Type': 'application/json'},
+            body: json.encode({
+              'name': _enteredName,
+              'quantity': _enteredQuan,
+              'category': _selectedCategory.title,
+            }),
+          )
+          .then((res) {
+            if (res.statusCode == 200) {
+              log(res.body);
+              final Map<String, dynamic> newItem = json.decode(res.body);
+              Navigator.of(context).pop(
+                GroceryItem(
+                  id: newItem['name'],
+                  name: _enteredName,
+                  quantity: _enteredQuan,
+                  category: _selectedCategory,
+                ),
+              );
+            }
+          });
+    }
+  }
+
+  bool _isloading = false;
   Category _selectedCategory = categories[Categories.dairy]!;
   String _enteredName = '';
   var _enteredQuan = 0;
@@ -37,7 +78,7 @@ class _NewItemState extends State<NewItem> {
                     if (value == null ||
                         value.trim().length <= 1 ||
                         value.trim().length >= 50) {
-                  return "Must be Between 1 and 50 char";
+                      return "Must be Between 1 and 50 char";
                     }
                     return null;
                   },
@@ -107,27 +148,28 @@ class _NewItemState extends State<NewItem> {
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     OutlinedButton(
-                      onPressed: () {
-                        _formkey.currentState!.reset();
-                      },
-                      child: const Text('Reset'),
+                      onPressed: _isloading
+                          ? null
+                          : () {
+                              _formkey.currentState!.reset();
+                            },
+                      child: const Text(
+                        'Reset',
+                        style: TextStyle(fontSize: 20),
+                      ),
                     ),
                     ElevatedButton(
-                      onPressed: () {
-                        if (_formkey.currentState!.validate()) {
-                          _formkey.currentState!.save();
-                        }
-
-                        Navigator.of(context).pop(
-                          GroceryItem(
-                            id: DateTime.now().toString(),
-                            name: _enteredName,
-                            quantity: _enteredQuan,
-                            category: _selectedCategory,
-                          ),
-                        );
-                      },
-                      child: const Text('Save New Item'),
+                      onPressed: _isloading ? null : saveditem,
+                      child: _isloading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(),
+                            )
+                          : const Text(
+                              "Save New Item ",
+                              style: TextStyle(fontSize: 20),
+                            ),
                     ),
                   ],
                 ),
